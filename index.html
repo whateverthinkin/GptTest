@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Snake</title>
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="panel intro-panel">
+        <p class="eyebrow">Classic arcade</p>
+        <h1>Snake</h1>
+        <p class="description">
+          Eat the food, grow the snake, and avoid walls or your own tail.
+        </p>
+        <div class="stats">
+          <div class="stat-card">
+            <span class="stat-label">Score</span>
+            <strong id="score">0</strong>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Status</span>
+            <strong id="status">Ready</strong>
+          </div>
+        </div>
+        <div class="actions">
+          <button id="start-button" type="button">Start</button>
+          <button id="restart-button" type="button">Restart</button>
+        </div>
+        <ul class="instructions">
+          <li>Move with arrow keys or WASD.</li>
+          <li>Use the on-screen controls on touch devices.</li>
+          <li>Press Space to pause and resume.</li>
+        </ul>
+      </section>
+
+      <section class="panel game-panel">
+        <div id="game-board" class="game-board" aria-label="Snake game board"></div>
+        <div class="mobile-controls" aria-label="Snake controls">
+          <button data-direction="up" type="button">↑</button>
+          <div class="mobile-controls-row">
+            <button data-direction="left" type="button">←</button>
+            <button data-direction="down" type="button">↓</button>
+            <button data-direction="right" type="button">→</button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
