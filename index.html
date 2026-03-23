@@ -183,9 +183,10 @@
         background: rgba(255, 255, 255, 0.08);
         color: var(--text);
         font-weight: 700;
-        font-size: 18px;
+        font-size: 22px;
         user-select: none;
         -webkit-tap-highlight-color: transparent;
+        line-height: 1;
       }
 
       .dir-up {
@@ -203,6 +204,55 @@
       .dir-down {
         grid-column: 2;
         grid-row: 3;
+      }
+
+      .death-modal {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.6);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+        z-index: 9999;
+      }
+
+      .death-modal.show {
+        display: flex;
+      }
+
+      .death-card {
+        width: min(520px, 100%);
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 18px;
+        padding: 16px;
+        backdrop-filter: blur(6px);
+      }
+
+      .death-title {
+        font-size: 24px;
+        font-weight: 900;
+        letter-spacing: 0.2px;
+        margin-bottom: 6px;
+      }
+
+      .death-reason {
+        color: var(--muted);
+        font-size: 14px;
+        margin-bottom: 12px;
+      }
+
+      .death-reason b {
+        color: var(--text);
+        font-weight: 800;
+      }
+
+      .death-actions {
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+        flex-wrap: wrap;
       }
 
       /* 兼容一些手机/平板：只要是触摸设备就尽量显示方向按钮 */
@@ -272,13 +322,31 @@
           </div>
 
           <div id="mobileControls" class="mobile-controls" aria-label="手机触控方向控制">
-            <button id="btnUp" class="dir-btn dir-up" type="button" aria-label="向上">U</button>
-            <button id="btnLeft" class="dir-btn dir-left" type="button" aria-label="向左">L</button>
-            <button id="btnRight" class="dir-btn dir-right" type="button" aria-label="向右">R</button>
-            <button id="btnDown" class="dir-btn dir-down" type="button" aria-label="向下">D</button>
+            <button id="btnUp" class="dir-btn dir-up" type="button" aria-label="向上">↑</button>
+            <button id="btnLeft" class="dir-btn dir-left" type="button" aria-label="向左">←</button>
+            <button id="btnRight" class="dir-btn dir-right" type="button" aria-label="向右">→</button>
+            <button id="btnDown" class="dir-btn dir-down" type="button" aria-label="向下">↓</button>
           </div>
           <div id="overlay" class="overlay">
             点击“开始 / 重新开始”或按 <b>Enter</b> 开始（手机可滑动或点方向按钮）
+          </div>
+
+          <div
+            id="deathModal"
+            class="death-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="游戏结束"
+          >
+            <div class="death-card">
+              <div class="death-title">你死了</div>
+              <div class="death-reason">
+                原因：<b id="deathReason">—</b>
+              </div>
+              <div class="death-actions">
+                <button id="btnRestartModal" class="primary" type="button">重新开始</button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -298,6 +366,9 @@
         const btnDown = document.getElementById("btnDown");
         const btnLeft = document.getElementById("btnLeft");
         const btnRight = document.getElementById("btnRight");
+        const deathModalEl = document.getElementById("deathModal");
+        const deathReasonEl = document.getElementById("deathReason");
+        const btnRestartModal = document.getElementById("btnRestartModal");
 
         // 网格参数（保持像素风清晰）
         const cols = 24;
@@ -307,6 +378,71 @@
         // 画布分辨率（用于像素绘制；CSS 负责缩放）
         const logicalW = cols * cell;
         const logicalH = rows * cell;
+
+        // ========= 音效（使用 WebAudio，避免额外音频文件）=========
+        let audioCtx = null;
+        let masterGain = null;
+
+        function ensureAudio() {
+          if (audioCtx) return;
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (!AudioContext) return;
+          audioCtx = new AudioContext();
+          masterGain = audioCtx.createGain();
+          masterGain.gain.value = 0.07; // 整体音量
+          masterGain.connect(audioCtx.destination);
+        }
+
+        function sfxEat() {
+          if (!audioCtx || !masterGain) return;
+          const t = audioCtx.currentTime;
+
+          const osc1 = audioCtx.createOscillator();
+          const g1 = audioCtx.createGain();
+          osc1.type = "square";
+          osc1.frequency.setValueAtTime(520, t);
+          osc1.frequency.exponentialRampToValueAtTime(1040, t + 0.06);
+          g1.gain.setValueAtTime(0.0001, t);
+          g1.gain.exponentialRampToValueAtTime(0.9, t + 0.01);
+          g1.gain.exponentialRampToValueAtTime(0.0001, t + 0.09);
+          osc1.connect(g1);
+          g1.connect(masterGain);
+          osc1.start(t);
+          osc1.stop(t + 0.1);
+
+          const osc2 = audioCtx.createOscillator();
+          const g2 = audioCtx.createGain();
+          osc2.type = "triangle";
+          osc2.frequency.setValueAtTime(780, t + 0.01);
+          osc2.frequency.exponentialRampToValueAtTime(1560, t + 0.07);
+          g2.gain.setValueAtTime(0.0001, t + 0.01);
+          g2.gain.exponentialRampToValueAtTime(0.6, t + 0.02);
+          g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.11);
+          osc2.connect(g2);
+          g2.connect(masterGain);
+          osc2.start(t + 0.01);
+          osc2.stop(t + 0.12);
+        }
+
+        function sfxDeath() {
+          if (!audioCtx || !masterGain) return;
+          const t = audioCtx.currentTime;
+
+          // 下降音 + 短促“噪声感”让死亡更明显
+          const osc = audioCtx.createOscillator();
+          const g = audioCtx.createGain();
+          osc.type = "sawtooth";
+          osc.frequency.setValueAtTime(440, t);
+          osc.frequency.exponentialRampToValueAtTime(110, t + 0.22);
+          g.gain.setValueAtTime(0.0001, t);
+          g.gain.exponentialRampToValueAtTime(0.75, t + 0.01);
+          g.gain.exponentialRampToValueAtTime(0.0001, t + 0.25);
+          osc.connect(g);
+          g.connect(masterGain);
+          osc.start(t);
+          osc.stop(t + 0.26);
+        }
+
         function setupCanvas() {
           const dpr = Math.max(1, window.devicePixelRatio || 1);
           canvas.width = logicalW * dpr;
@@ -372,6 +508,10 @@
         }
 
         function resetGame() {
+          // 确保在用户手势触发后创建音频上下文（手机/微信内置浏览器里尤其重要）
+          ensureAudio();
+          if (audioCtx && audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
+
           score = 0;
           scoreEl.textContent = "0";
           direction = { x: 1, y: 0 };
@@ -389,6 +529,7 @@
           state = "running";
           setOverlay("游戏进行中，祝你好运！");
           btnPause.textContent = "暂停";
+          if (deathModalEl) deathModalEl.classList.remove("show");
 
           // 先渲染一次再开始计时
           draw();
@@ -412,6 +553,15 @@
           state = "gameover";
           setOverlay(`游戏结束：${reason}。点击“开始 / 重新开始”再来一局。`);
           btnPause.textContent = "暂停";
+
+          if (audioCtx) {
+            sfxDeath();
+          }
+
+          if (deathModalEl && deathReasonEl) {
+            deathReasonEl.textContent = reason;
+            deathModalEl.classList.add("show");
+          }
 
           if (score > best) {
             best = score;
@@ -468,6 +618,7 @@
             scoreEl.textContent = String(score);
             placeFood();
             // 不删尾巴：变长
+            sfxEat();
           } else {
             // 未吃到：移除尾巴
             snake.shift();
@@ -732,11 +883,19 @@
         });
 
         btnStart.addEventListener("click", () => {
+          ensureAudio();
+          if (audioCtx && audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
           if (state === "running") {
             // 重新开始
             resetGame();
             return;
           }
+          resetGame();
+        });
+
+        btnRestartModal.addEventListener("click", () => {
+          ensureAudio();
+          if (audioCtx && audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
           resetGame();
         });
 
