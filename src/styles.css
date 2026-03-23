@@ -1,0 +1,150 @@
+:root {
+  color-scheme: light;
+  font-family: Arial, Helvetica, sans-serif;
+  background: #f4f1ea;
+  color: #1d1d1d;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: #f4f1ea;
+}
+
+button {
+  border: 1px solid #1d1d1d;
+  background: #fff;
+  color: inherit;
+  padding: 0.65rem 1rem;
+  font: inherit;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #f0eadf;
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  padding: 1.5rem;
+  align-items: start;
+}
+
+.panel {
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid #1d1d1d;
+  padding: 1.25rem;
+}
+
+.eyebrow {
+  margin: 0 0 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.8rem;
+}
+
+h1 {
+  margin: 0 0 0.75rem;
+}
+
+.description {
+  margin: 0 0 1rem;
+  line-height: 1.5;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.stat-card {
+  border: 1px solid #1d1d1d;
+  padding: 0.75rem;
+  background: #fff;
+}
+
+.stat-label {
+  display: block;
+  font-size: 0.8rem;
+  margin-bottom: 0.25rem;
+}
+
+.actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.instructions {
+  margin: 1rem 0 0;
+  padding-left: 1.2rem;
+  line-height: 1.5;
+}
+
+.game-panel {
+  display: grid;
+  gap: 1rem;
+  justify-items: center;
+}
+
+.game-board {
+  --grid-size: 16;
+  width: min(88vw, 32rem);
+  aspect-ratio: 1;
+  display: grid;
+  grid-template-columns: repeat(var(--grid-size), 1fr);
+  grid-template-rows: repeat(var(--grid-size), 1fr);
+  background-image:
+    linear-gradient(to right, #d4d0c7 1px, transparent 1px),
+    linear-gradient(to bottom, #d4d0c7 1px, transparent 1px);
+  background-size: calc(100% / var(--grid-size)) calc(100% / var(--grid-size));
+  background-color: #fff;
+  border: 1px solid #1d1d1d;
+}
+
+.cell {
+  margin: 1px;
+}
+
+.snake {
+  background: #1d1d1d;
+}
+
+.snake-head {
+  background: #3f6a2b;
+}
+
+.food {
+  background: #c4492d;
+  border-radius: 999px;
+}
+
+.mobile-controls {
+  display: grid;
+  gap: 0.5rem;
+  justify-items: center;
+}
+
+.mobile-controls-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.mobile-controls button {
+  min-width: 3rem;
+}
+
+@media (min-width: 900px) {
+  .mobile-controls {
+    display: none;
+  }
+}
