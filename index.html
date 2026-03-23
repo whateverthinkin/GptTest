@@ -205,9 +205,20 @@
         grid-row: 3;
       }
 
-      @media (max-width: 560px) {
+      /* 兼容一些手机/平板：只要是触摸设备就尽量显示方向按钮 */
+      @media (pointer: coarse) {
+        .mobile-controls {
+          display: grid;
+        }
+      }
+
+      @media (max-width: 700px) {
         body {
-          padding: 10px 0; /* 给手机屏幕留出一点上下安全边距 */
+          /* 手机屏幕高度可能不够：避免垂直居中导致控件跑出视口 */
+          place-items: start center;
+          padding: 12px 0;
+          min-height: auto;
+          overflow-y: auto;
         }
 
         .app {
