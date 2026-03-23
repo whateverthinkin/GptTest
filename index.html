@@ -402,6 +402,15 @@
         // ========= 音效（使用 WebAudio，避免额外音频文件）=========
         let audioCtx = null;
         let masterGain = null;
+        let musicGain = null;
+        let musicTimer = null;
+        let musicNextNoteTime = 0;
+        let musicStepIndex = 0;
+
+        function freqFromMidi(midi) {
+          // A4=440，对应 midi=69
+          return 440 * Math.pow(2, (midi - 69) / 12);
+        }
 
         function ensureAudio() {
           if (audioCtx) return;
@@ -411,6 +420,87 @@
           masterGain = audioCtx.createGain();
           masterGain.gain.value = 0.07; // 整体音量
           masterGain.connect(audioCtx.destination);
+
+          // 背景音乐单独一条增益，方便暂停/停止
+          musicGain = audioCtx.createGain();
+          musicGain.gain.value = 0.0;
+          musicGain.connect(masterGain);
+        }
+
+        function startMusic() {
+          if (!audioCtx || !musicGain) return;
+          if (musicTimer) return; // 防重复启动
+
+          // 从用户手势触发时开始：确保已 resume
+          if (audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
+
+          // 慢慢拉起音量，避免突然刺耳
+          musicGain.gain.setTargetAtTime(0.08, audioCtx.currentTime, 0.03);
+
+          const TEMPO = 120; // bpm
+          const stepsPerBeat = 4; // 1拍=4个16分步
+          const stepDur = 60 / TEMPO / stepsPerBeat;
+          const stepsPerBar = 16;
+          const chordRoots = [60, 57, 55, 57]; // C, A, G, A（大致好听即可）
+          const melodyOffsets = [0, 2, 4, 7, 9, 7, 4, 2]; // 简单上行/下行
+
+          musicNextNoteTime = audioCtx.currentTime + 0.05;
+          musicStepIndex = 0;
+
+          function scheduleNote(midi, t, dur, type, vol) {
+            const osc = audioCtx.createOscillator();
+            const g = audioCtx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freqFromMidi(midi), t);
+            g.gain.setValueAtTime(0.0001, t);
+            g.gain.exponentialRampToValueAtTime(Math.max(0.0002, vol), t + 0.01);
+            g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+            osc.connect(g);
+            g.connect(musicGain);
+            osc.start(t);
+            osc.stop(t + dur + 0.02);
+          }
+
+          function scheduleTick() {
+            const lookahead = 0.2; // 提前调度秒
+            while (musicNextNoteTime < audioCtx.currentTime + lookahead) {
+              const barIndex = Math.floor(musicStepIndex / stepsPerBar);
+              const chordRoot = chordRoots[barIndex % chordRoots.length];
+
+              // 小节里：主旋律每 1~2 步响一次，底鼓在每拍响
+              const stepInBar = musicStepIndex % stepsPerBar;
+              const melodyDegree = melodyOffsets[musicStepIndex % melodyOffsets.length];
+
+              // 旋律（偶数步更密一点）
+              if (stepInBar % 2 === 0) {
+                // 上下两层：主旋律在中高音，增加“游戏音乐”感
+                const midi = chordRoot + melodyDegree + 12; // 上移一组八度
+                scheduleNote(midi, musicNextNoteTime, 0.09, "square", 0.07);
+              }
+
+              // bass（每拍一次：stepInBar=0,4,8,12）
+              if (stepInBar % 4 === 0) {
+                const bassMidi = chordRoot - 12; // 低音
+                scheduleNote(bassMidi, musicNextNoteTime, 0.14, "triangle", 0.05);
+              }
+
+              musicNextNoteTime += stepDur;
+              musicStepIndex++;
+            }
+          }
+
+          // 定时驱动调度
+          musicTimer = window.setInterval(scheduleTick, 50);
+        }
+
+        function stopMusic() {
+          if (!audioCtx || !musicGain) return;
+          if (musicTimer) {
+            window.clearInterval(musicTimer);
+            musicTimer = null;
+          }
+          // 音量快速衰减到 0
+          musicGain.gain.setTargetAtTime(0.0, audioCtx.currentTime, 0.03);
         }
 
         function sfxEat() {
@@ -532,6 +622,9 @@
           ensureAudio();
           if (audioCtx && audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
 
+          // 新游戏开始：启动背景音乐（“全程都有”）
+          startMusic();
+
           score = 0;
           scoreEl.textContent = "0";
           direction = { x: 1, y: 0 };
@@ -562,11 +655,13 @@
             state = "paused";
             btnPause.textContent = "继续";
             setOverlay("已暂停，按“继续”或按空格恢复");
+            stopMusic();
           } else {
             state = "running";
             btnPause.textContent = "暂停";
             setOverlay("游戏进行中！");
             scheduleNextTick();
+            startMusic();
           }
         }
 
@@ -574,6 +669,9 @@
           state = "gameover";
           setOverlay(`游戏结束：${reason}。点击“开始 / 重新开始”再来一局。`);
           btnPause.textContent = "暂停";
+
+          // 死亡时停止背景音乐，保留死亡音效
+          stopMusic();
 
           if (audioCtx) {
             sfxDeath();
@@ -954,6 +1052,9 @@
           // 启动弹窗：让“开始”变成一个单独的小窗
           if (startModalEl) startModalEl.classList.add("show");
           setOverlay("游戏未开始");
+
+          // 空闲态不播放背景音乐
+          stopMusic();
         }
 
         initIdle();
