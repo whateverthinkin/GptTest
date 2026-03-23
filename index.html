@@ -102,6 +102,7 @@
         width: 100%;
         height: auto;
         image-rendering: pixelated;
+        touch-action: none; /* 让移动端手势不触发页面滚动 */
         border-radius: 12px;
         background: rgba(0, 0, 0, 0.35);
         border: 1px solid rgba(255, 255, 255, 0.08);
@@ -156,6 +157,76 @@
       .overlay b {
         color: var(--text);
       }
+
+      /* 手机端：提供触控方向控制 */
+      .mobile-controls {
+        display: none;
+        width: min(320px, 100%);
+        margin-top: 10px;
+        padding: 6px;
+        border-radius: 14px;
+        background: rgba(0, 0, 0, 0.18);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        grid-template-columns: repeat(3, 1fr);
+        grid-template-rows: repeat(3, 1fr);
+        gap: 10px;
+        align-items: center;
+        justify-items: center;
+      }
+
+      .dir-btn {
+        cursor: pointer;
+        width: 56px;
+        height: 56px;
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--text);
+        font-weight: 700;
+        font-size: 18px;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      .dir-up {
+        grid-column: 2;
+        grid-row: 1;
+      }
+      .dir-left {
+        grid-column: 1;
+        grid-row: 2;
+      }
+      .dir-right {
+        grid-column: 3;
+        grid-row: 2;
+      }
+      .dir-down {
+        grid-column: 2;
+        grid-row: 3;
+      }
+
+      @media (max-width: 560px) {
+        body {
+          padding: 10px 0; /* 给手机屏幕留出一点上下安全边距 */
+        }
+
+        .app {
+          width: calc(100vw - 16px);
+          gap: 10px;
+        }
+
+        .topbar {
+          padding: 10px 10px;
+        }
+
+        button {
+          padding: 10px 12px;
+        }
+
+        .mobile-controls {
+          display: grid;
+        }
+      }
     </style>
   </head>
   <body>
@@ -188,8 +259,15 @@
             </div>
             <div>提示：不要撞墙或撞到自己</div>
           </div>
+
+          <div id="mobileControls" class="mobile-controls" aria-label="手机触控方向控制">
+            <button id="btnUp" class="dir-btn dir-up" type="button" aria-label="向上">U</button>
+            <button id="btnLeft" class="dir-btn dir-left" type="button" aria-label="向左">L</button>
+            <button id="btnRight" class="dir-btn dir-right" type="button" aria-label="向右">R</button>
+            <button id="btnDown" class="dir-btn dir-down" type="button" aria-label="向下">D</button>
+          </div>
           <div id="overlay" class="overlay">
-            点击“开始 / 重新开始”或按 <b>Enter</b> 开始
+            点击“开始 / 重新开始”或按 <b>Enter</b> 开始（手机可滑动或点方向按钮）
           </div>
         </div>
       </div>
@@ -205,6 +283,10 @@
         const overlayEl = document.getElementById("overlay");
         const btnStart = document.getElementById("btnStart");
         const btnPause = document.getElementById("btnPause");
+        const btnUp = document.getElementById("btnUp");
+        const btnDown = document.getElementById("btnDown");
+        const btnLeft = document.getElementById("btnLeft");
+        const btnRight = document.getElementById("btnRight");
 
         // 网格参数（保持像素风清晰）
         const cols = 24;
@@ -212,8 +294,16 @@
         const cell = 20;
 
         // 画布分辨率（用于像素绘制；CSS 负责缩放）
-        canvas.width = cols * cell;
-        canvas.height = rows * cell;
+        const logicalW = cols * cell;
+        const logicalH = rows * cell;
+        function setupCanvas() {
+          const dpr = Math.max(1, window.devicePixelRatio || 1);
+          canvas.width = logicalW * dpr;
+          canvas.height = logicalH * dpr;
+          // 让绘制仍在“逻辑像素坐标系”完成，避免需要改绘制逻辑
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        }
+        setupCanvas();
 
         const STORAGE_KEY = "snake.highScore.v1";
 
@@ -377,7 +467,7 @@
         }
 
         function draw(explosionCell, isHit) {
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.clearRect(0, 0, logicalW, logicalH);
 
           // 背景网格（更有“游戏感”但不过度）
           ctx.save();
@@ -581,6 +671,55 @@
           else if (key === "arrowright" || key === "d") trySetDirection(1, 0);
         });
 
+        function ensureRunningForInput() {
+          if (state === "idle" || state === "gameover") resetGame();
+        }
+
+        function bindDirButton(btn, dx, dy) {
+          if (!btn) return;
+          btn.addEventListener("pointerdown", (e) => {
+            e.preventDefault();
+            // 禁止暂停/游戏结束时被触控方向“意外改变”
+            if (state === "paused") return;
+            ensureRunningForInput();
+            trySetDirection(dx, dy);
+          });
+        }
+
+        bindDirButton(btnUp, 0, -1);
+        bindDirButton(btnDown, 0, 1);
+        bindDirButton(btnLeft, -1, 0);
+        bindDirButton(btnRight, 1, 0);
+
+        // 移动端额外支持：在画布上滑动切换方向
+        let touchStart = null;
+        canvas.addEventListener("pointerdown", (e) => {
+          if (e.pointerType !== "touch") return;
+          touchStart = { x: e.clientX, y: e.clientY, t: Date.now() };
+          e.preventDefault();
+        });
+        canvas.addEventListener("pointerup", (e) => {
+          if (!touchStart) return;
+          if (e.pointerType !== "touch") return;
+          const dx = e.clientX - touchStart.x;
+          const dy = e.clientY - touchStart.y;
+          touchStart = null;
+
+          // 避免轻微抖动导致误判
+          const threshold = 28;
+          if (Math.abs(dx) < threshold && Math.abs(dy) < threshold) return;
+
+          if (state === "paused") return;
+          ensureRunningForInput();
+
+          if (Math.abs(dx) > Math.abs(dy)) {
+            trySetDirection(dx > 0 ? 1 : -1, 0);
+          } else {
+            trySetDirection(0, dy > 0 ? 1 : -1);
+          }
+          e.preventDefault();
+        });
+
         btnStart.addEventListener("click", () => {
           if (state === "running") {
             // 重新开始
@@ -613,10 +752,16 @@
           placeFood();
           setSpeedLabel(null);
           draw();
-          setOverlay('点击“开始 / 重新开始”或按 <b>Enter</b> 开始');
+          setOverlay('点击“开始 / 重新开始”或按 <b>Enter</b> 开始（手机可滑动或点方向按钮）');
         }
 
         initIdle();
+
+        // 设备旋转/缩放时重置画布像素比，保持清晰度
+        window.addEventListener("resize", () => {
+          setupCanvas();
+          draw();
+        });
       })();
     </script>
   </body>
