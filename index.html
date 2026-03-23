@@ -442,12 +442,13 @@
           // 慢慢拉起音量，避免突然刺耳
           musicGain.gain.setTargetAtTime(0.7, audioCtx.currentTime, 0.03);
 
-          const TEMPO = 120; // bpm
+          const TEMPO = 96; // bpm，更舒缓
           const stepsPerBeat = 4; // 1拍=4个16分步
           const stepDur = 60 / TEMPO / stepsPerBeat;
           const stepsPerBar = 16;
-          const chordRoots = [60, 57, 55, 57]; // C, A, G, A（大致好听即可）
-          const melodyOffsets = [0, 2, 4, 7, 9, 7, 4, 2]; // 简单上行/下行
+          // C - Am - F - G 进行，整体比之前更稳定
+          const chordRoots = [60, 57, 53, 55];
+          const chordTypes = ["maj", "min", "maj", "maj"];
 
           musicNextNoteTime = audioCtx.currentTime + 0.05;
           musicStepIndex = 0;
@@ -466,27 +467,39 @@
             osc.stop(t + dur + 0.02);
           }
 
+          function chordTones(root, type) {
+            // 返回三和弦音高（midi）
+            if (type === "min") return [root, root + 3, root + 7];
+            return [root, root + 4, root + 7];
+          }
+
           function scheduleTick() {
             const lookahead = 0.2; // 提前调度秒
             while (musicNextNoteTime < audioCtx.currentTime + lookahead) {
               const barIndex = Math.floor(musicStepIndex / stepsPerBar);
-              const chordRoot = chordRoots[barIndex % chordRoots.length];
+              const progIndex = barIndex % chordRoots.length;
+              const chordRoot = chordRoots[progIndex];
+              const tones = chordTones(chordRoot, chordTypes[progIndex]);
 
-              // 小节里：主旋律每 1~2 步响一次，底鼓在每拍响
               const stepInBar = musicStepIndex % stepsPerBar;
-              const melodyDegree = melodyOffsets[musicStepIndex % melodyOffsets.length];
+              const arpIndex = Math.floor(stepInBar / 2) % 3; // 每2步换一个和弦音
 
-              // 旋律（偶数步更密一点）
+              // 主旋律：分解和弦（更顺耳），使用 triangle 减少刺耳感
               if (stepInBar % 2 === 0) {
-                // 上下两层：主旋律在中高音，增加“游戏音乐”感
-                const midi = chordRoot + melodyDegree + 12; // 上移一组八度
-                scheduleNote(midi, musicNextNoteTime, 0.12, "square", 0.45);
+                const midi = tones[arpIndex] + 12; // 中高音区
+                scheduleNote(midi, musicNextNoteTime, 0.14, "triangle", 0.26);
               }
 
-              // bass（每拍一次：stepInBar=0,4,8,12）
+              // 低音：每拍一次，给节奏支撑
               if (stepInBar % 4 === 0) {
                 const bassMidi = chordRoot - 12; // 低音
-                scheduleNote(bassMidi, musicNextNoteTime, 0.18, "triangle", 0.35);
+                scheduleNote(bassMidi, musicNextNoteTime, 0.2, "sine", 0.22);
+              }
+
+              // 轻垫底：每半小节一次，增强“连贯背景感”
+              if (stepInBar === 0 || stepInBar === 8) {
+                const padMidi = tones[1] + 5;
+                scheduleNote(padMidi, musicNextNoteTime, 0.34, "sine", 0.12);
               }
 
               musicNextNoteTime += stepDur;
