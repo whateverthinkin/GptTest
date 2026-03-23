@@ -418,7 +418,7 @@
           if (!AudioContext) return;
           audioCtx = new AudioContext();
           masterGain = audioCtx.createGain();
-          masterGain.gain.value = 0.07; // 整体音量
+          masterGain.gain.value = 0.2; // 整体音量（原先偏小，手机上几乎听不见）
           masterGain.connect(audioCtx.destination);
 
           // 背景音乐单独一条增益，方便暂停/停止
@@ -431,11 +431,16 @@
           if (!audioCtx || !musicGain) return;
           if (musicTimer) return; // 防重复启动
 
-          // 从用户手势触发时开始：确保已 resume
-          if (audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
+          // 在微信/移动端上，必须先 resume 成功再调度音符
+          if (audioCtx.state === "suspended") {
+            audioCtx.resume().then(() => {
+              startMusic();
+            }).catch(() => {});
+            return;
+          }
 
           // 慢慢拉起音量，避免突然刺耳
-          musicGain.gain.setTargetAtTime(0.08, audioCtx.currentTime, 0.03);
+          musicGain.gain.setTargetAtTime(0.25, audioCtx.currentTime, 0.03);
 
           const TEMPO = 120; // bpm
           const stepsPerBeat = 4; // 1拍=4个16分步
@@ -488,6 +493,9 @@
               musicStepIndex++;
             }
           }
+
+          // 先立即调度一批，避免首拍“无声等待”
+          scheduleTick();
 
           // 定时驱动调度
           musicTimer = window.setInterval(scheduleTick, 50);
