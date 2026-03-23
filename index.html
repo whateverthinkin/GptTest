@@ -348,6 +348,24 @@
               </div>
             </div>
           </div>
+
+          <div
+            id="startModal"
+            class="death-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="开始游戏"
+          >
+            <div class="death-card">
+              <div class="death-title">开始游戏</div>
+              <div class="death-reason">
+                提示：<b>手机可滑动</b> 或点下面箭头控制；点击“开始”进入游戏。
+              </div>
+              <div class="death-actions">
+                <button id="btnStartModal" class="primary" type="button">开始</button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -369,6 +387,8 @@
         const deathModalEl = document.getElementById("deathModal");
         const deathReasonEl = document.getElementById("deathReason");
         const btnRestartModal = document.getElementById("btnRestartModal");
+        const startModalEl = document.getElementById("startModal");
+        const btnStartModal = document.getElementById("btnStartModal");
 
         // 网格参数（保持像素风清晰）
         const cols = 24;
@@ -530,6 +550,7 @@
           setOverlay("游戏进行中，祝你好运！");
           btnPause.textContent = "暂停";
           if (deathModalEl) deathModalEl.classList.remove("show");
+          if (startModalEl) startModalEl.classList.remove("show");
 
           // 先渲染一次再开始计时
           draw();
@@ -562,6 +583,8 @@
             deathReasonEl.textContent = reason;
             deathModalEl.classList.add("show");
           }
+
+          if (startModalEl) startModalEl.classList.remove("show");
 
           if (score > best) {
             best = score;
@@ -899,6 +922,12 @@
           resetGame();
         });
 
+        btnStartModal.addEventListener("click", () => {
+          ensureAudio();
+          if (audioCtx && audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
+          resetGame();
+        });
+
         btnPause.addEventListener("click", () => {
           if (state === "running") setPaused(true);
           else if (state === "paused") setPaused(false);
@@ -922,7 +951,9 @@
           placeFood();
           setSpeedLabel(null);
           draw();
-          setOverlay('点击“开始 / 重新开始”或按 <b>Enter</b> 开始（手机可滑动或点方向按钮）');
+          // 启动弹窗：让“开始”变成一个单独的小窗
+          if (startModalEl) startModalEl.classList.add("show");
+          setOverlay("游戏未开始");
         }
 
         initIdle();
